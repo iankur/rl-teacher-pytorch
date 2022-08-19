@@ -3,6 +3,9 @@ from time import time
 from time import sleep
 
 import numpy as np
+import torch
+import torch.nn as nn
+
 from agents.parallel_trpo.parallel_trpo.utils import filter_ob
 
 class Actor(multiprocess.Process):
@@ -17,8 +20,9 @@ class Actor(multiprocess.Process):
         self.max_timesteps_per_episode = max_timesteps_per_episode
 
     def forward(self, obs):
+        obs = torch.from_numpy(obs).float()
         avg_action_dist = self.net(obs)
-        logstd_action_dist = torch.tile(self.logstd_action_dist_param, torch.stack((avg_action_dist.shape[0], 1)))
+        logstd_action_dist = torch.tile(self.logstd_action_dist_param, [avg_action_dist.shape[0], 1])
     
         return avg_action_dist, logstd_action_dist
 
@@ -26,11 +30,14 @@ class Actor(multiprocess.Process):
     # TODO Cleanup
     def set_policy(self, weights):
         for i,var in enumerate(self.policy_vars):
-            var = weights[i]
+            var.data.copy_(weights[i])
 
     def act(self, obs):
         obs = np.expand_dims(obs, 0)
-        avg_action_dist, logstd_action_dist = self.forward(obs)
+        with torch.no_grad():
+            avg_action_dist, logstd_action_dist = self.forward(obs)
+            avg_action_dist = avg_action_dist.numpy()
+            logstd_action_dist = logstd_action_dist.numpy()
         # samples the guassian distribution
         act = avg_action_dist + np.exp(logstd_action_dist) * np.random.randn(*logstd_action_dist.shape)
         return act.ravel(), avg_action_dist, logstd_action_dist
@@ -53,8 +60,10 @@ class Actor(multiprocess.Process):
         )
 
         self.logstd_action_dist_param = nn.Parameter(
-            (.01 * np.random.randn(1, action_size)).astype(np.float32)
+            .01 * torch.from_numpy(np.random.randn(1, action_size).astype(np.float32))
         )
+
+        self.policy_vars = list(self.net.parameters()) + [self.logstd_action_dist_param]
 
         while True:
             next_task = self.task_q.get(block=True)

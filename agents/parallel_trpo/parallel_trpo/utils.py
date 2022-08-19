@@ -1,7 +1,9 @@
 from __future__ import division
 
+import math
 import numpy as np
 import scipy.signal
+import torch
 
 # KL divergence with itself, holding first argument fixed
 def gauss_selfKL_firstfixed(mu, logstd):
@@ -16,7 +18,7 @@ def gauss_selfKL_firstfixed(mu, logstd):
 # probability to take action x, given paramaterized guassian distribution
 def gauss_log_prob(mu, logstd, x):
     var = torch.exp(2 * logstd)
-    gp = -torch.square(x - mu) / (2 * var) - .5 * torch.log(2 * np.pi) - logstd
+    gp = -torch.square(x - mu) / (2 * var) - .5 * torch.log(2 * torch.tensor(math.pi)) - logstd
     return torch.sum(gp, dim=1)
 
 
@@ -87,16 +89,15 @@ class FilterOb:
 filter_ob = FilterOb()
 
 
-def flatgrad(loss, var_list):
-    grads = torch.autograd.grad(loss, var_list)
-    return torch.cat([tf.reshape(grad, [tf.size(v)]) for (v, grad) in zip(var_list, grads)], dim=0)
+def flatgrad(loss, var_list, retain_graph=False):
+    grads = torch.autograd.grad(loss, var_list, retain_graph=retain_graph)
+    return torch.cat([torch.reshape(grad, (-1,)) for (v, grad) in zip(var_list, grads)], dim=0)
 
 
 def conjugate_gradient(f_Ax, b, cg_iters=10, residual_tol=1e-10):
-    # in numpy
-    p = b.copy()
-    r = b.copy()
-    x = np.zeros_like(b)
+    p = b.detach()
+    r = b.detach()
+    x = torch.zeros_like(b)
     rdotr = r.dot(r)
     for i in range(cg_iters):
         z = f_Ax(p)

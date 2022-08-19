@@ -20,6 +20,12 @@ class FullyConnectedMLP(object):
         )
 
     def run(self, obs, act):
-        flat_obs = torch.flatten(obs)
+        obs = torch.from_numpy(obs).float()
+        act = torch.from_numpy(act).float()
+        flat_obs = torch.flatten(obs, start_dim=1)
         x = torch.cat([flat_obs, act], dim=1)
         return self.model(x)
+
+    @property
+    def parameters(self):
+        return self.model.parameters()

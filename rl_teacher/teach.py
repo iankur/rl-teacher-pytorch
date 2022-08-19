@@ -5,6 +5,7 @@ import random
 from collections import deque
 from time import time, sleep
 
+import torch
 import numpy as np
 from agents.parallel_trpo.parallel_trpo.train import train_parallel_trpo
 # from pposgd_mpi.run_mujoco import train_pposgd_mpi
@@ -57,7 +58,7 @@ class ComparisonRewardPredictor():
         # self.graph = self._build_model()
 
         self.mlp = FullyConnectedMLP(self.obs_shape, self.act_shape)
-        self.optim = torch.optim.Adam(self.mlp.parameters())
+        self.optim = torch.optim.Adam(self.mlp.parameters)
 
     def _predict_rewards(self, obs_segments, act_segments):
         """
@@ -69,8 +70,8 @@ class ComparisonRewardPredictor():
         batchsize, segment_length = obs_segments.shape[:2]
 
         # Temporarily chop up segments into individual observations and actions
-        obs = torch.reshape(obs_segments, (-1,) + self.obs_shape)
-        acts = torch.reshape(act_segments, (-1,) + self.act_shape)
+        obs = np.reshape(obs_segments, (-1,) + self.obs_shape)
+        acts = np.reshape(act_segments, (-1,) + self.act_shape)
 
         # Run them through our neural network
         rewards = self.mlp.run(obs, acts)
@@ -114,7 +115,7 @@ class ComparisonRewardPredictor():
 
         labels = torch.tensor(labels).long()
         data_loss = torch.nn.functional.cross_entropy(
-            input=logits, target=torch.tensor(labels).long()
+            input=reward_logits, target=torch.tensor(labels).long()
         )
         # data_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=reward_logits, labels=labels)
 
@@ -135,6 +136,7 @@ class ComparisonRewardPredictor():
             np.asarray([path["actions"]]),
             # training = False
             )
+            q_value = q_value.numpy()
         return q_value[0]
 
     def path_callback(self, path):
@@ -171,7 +173,7 @@ class ComparisonRewardPredictor():
         labels = np.asarray([comp['label'] for comp in labeled_comparisons])
 
         # TODO check is loss should be scalar or tensor?
-        loss = self.train(segment_obs=left_obs, segment_act=left_acts, segment_alt_obs=right_obs, segment_alt_act=right_acts)
+        loss = self.train(segment_obs=left_obs, segment_act=left_acts, segment_alt_obs=right_obs, segment_alt_act=right_acts, labels=labels)
         self._elapsed_predictor_training_iters += 1
         self._write_training_summaries(loss)
 
@@ -184,7 +186,7 @@ class ComparisonRewardPredictor():
             validation_obs = np.asarray([path["obs"] for path in recent_paths])
             validation_acts = np.asarray([path["actions"] for path in recent_paths])
             with torch.no_grad():
-                q_value = self._predict_rewards(validation_obs, validation_acts)
+                q_value = self._predict_rewards(validation_obs, validation_acts).numpy()
             ep_reward_pred = np.sum(q_value, axis=1)
             reward_true = np.asarray([path['original_rewards'] for path in recent_paths])
             ep_reward_true = np.sum(reward_true, axis=1)
