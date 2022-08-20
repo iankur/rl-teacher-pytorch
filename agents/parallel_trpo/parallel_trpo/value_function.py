@@ -1,5 +1,6 @@
 import numpy as np
 import torch.nn as nn
+
 from agents.parallel_trpo.parallel_trpo import utils
 
 class VF(object):

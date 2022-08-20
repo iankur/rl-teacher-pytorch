@@ -124,7 +124,7 @@ class TRPO(object):
             start = 0
             tangents = []
             for var in self.policy_vars:
-                tangents.append([start: start+torch.numel(var)].view(var.size()))
+                tangents.append(p[start: start+torch.numel(var)].view(var.size()))
                 start += torch.numel(var)
 
             gvp = [torch.sum(g * t) for (g, t) in zip(grads, tangents)]
