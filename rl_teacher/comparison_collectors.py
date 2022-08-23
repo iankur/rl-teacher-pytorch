@@ -2,6 +2,8 @@ import multiprocessing
 import os
 import os.path as osp
 import uuid
+import shutil
+from subprocess import getoutput
 
 import numpy as np
 
@@ -52,7 +54,12 @@ class SyntheticComparisonCollector(object):
 def _write_and_upload_video(env_id, gcs_path, local_path, segment):
     env = make_with_torque_removed(env_id)
     write_segment_to_video(segment, fname=local_path, env=env)
-    upload_to_gcs(local_path, gcs_path)
+    # upload_to_gcs(local_path, gcs_path)
+    # shutil.copy(local_path, gcs_path)
+    
+def gdrive_shareable_link(file_path):
+  fid = getoutput("xattr -p 'user.drive.id' " + "'" + file_path + "'")
+  return f"https://drive.google.com/file/d/{fid}"
 
 class HumanComparisonCollector():
     def __init__(self, env_id, experiment_name):
@@ -71,11 +78,13 @@ class HumanComparisonCollector():
         media_id = "%s-%s.mp4" % (comparison_uuid, side)
         local_path = osp.join(tmp_media_dir, media_id)
         gcs_bucket = os.environ.get('RL_TEACHER_GCS_BUCKET')
-        gcs_path = osp.join(gcs_bucket, media_id)
+        gcs_path = None # osp.join(gcs_bucket, media_id)
         self._upload_workers.apply_async(_write_and_upload_video, (self.env_id, gcs_path, local_path, segment))
 
-        media_url = "https://storage.googleapis.com/%s/%s" % (gcs_bucket.lstrip("gs://"), media_id)
-        return media_url
+        # media_url = "https://storage.googleapis.com/%s/%s" % (gcs_bucket.lstrip("gs://"), media_id)
+        # return media_url
+        # return gdrive_shareable_link(gcs_path)
+        return local_path
 
     def _create_comparison_in_webapp(self, left_seg, right_seg):
         """Creates a comparison DB object. Returns the db_id of the comparison"""

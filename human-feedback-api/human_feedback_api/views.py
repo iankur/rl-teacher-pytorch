@@ -1,5 +1,6 @@
 from collections import namedtuple
 from datetime import timedelta, datetime
+from base64 import b64encode
 
 from django import template
 from django.db.models import Q
@@ -92,7 +93,15 @@ def ajax_response(request, experiment_name):
 
 def show_comparison(request, comparison_id):
     comparison = get_object_or_404(Comparison, pk=comparison_id)
-    return render(request, 'show_comparison.html', context={"comparison": comparison})
+
+    left_mp4 = open(comparison.media_url_1,'rb').read()
+    left_data_url = "data:video/mp4;base64," + b64encode(left_mp4).decode()
+
+    right_mp4 = open(comparison.media_url_2,'rb').read()
+    right_data_url = "data:video/mp4;base64," + b64encode(right_mp4).decode()
+    return render(request, 'show_feedback.html', context={
+        "feedback": feedback, "left_data_url": left_data_url, "right_data_url": right_data_url}
+    )
 
 def respond(request, experiment_name):
     comparisons = list(_all_comparisons(experiment_name)[:3])
