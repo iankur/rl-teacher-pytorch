@@ -54,6 +54,8 @@ class ImageEncoder(object):
     def __init__(self, output_path, frame_shape, frames_per_sec):
         self.proc = None
         self.output_path = output_path
+        assert self.output_path.endswith('.mp4')
+        self.output_path_tmp = output_path[:-4] + '.tmp.mp4'
         # Frame shape should be lines-first, so w and h are swapped
         h, w, pixfmt = frame_shape
         if pixfmt != 3 and pixfmt != 4:
@@ -99,7 +101,7 @@ class ImageEncoder(object):
             '-vf', 'vflip',
             '-vcodec', 'libx264',
             '-pix_fmt', 'yuv420p',
-            self.output_path
+            self.output_path_tmp
         )
 
         if hasattr(os, 'setsid'):  # setsid not present on Windows
@@ -129,6 +131,8 @@ class ImageEncoder(object):
         ret = self.proc.wait()
         if ret != 0:
             raise Exception("VideoRecorder encoder exited with status {}".format(ret))
+        else:
+            os.rename(self.output_path_tmp, self.output_path)
 
 def upload_to_gcs(local_path, gcs_path):
     assert osp.isfile(local_path), "%s must be a file" % local_path

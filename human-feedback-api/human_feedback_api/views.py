@@ -2,6 +2,8 @@ from collections import namedtuple
 from datetime import timedelta, datetime
 from base64 import b64encode
 
+import os
+
 from django import template
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
@@ -44,7 +46,9 @@ def _all_comparisons(experiment_name, use_locking=True):
     ready = not_responded & not_in_progress & finished_uploading_media
 
     # Sort by priority, then put newest labels first
-    return Comparison.objects.filter(ready, experiment_name=experiment_name).order_by('-priority', '-created_at')
+    comparisons = Comparison.objects.filter(ready, experiment_name=experiment_name) # .order_by('-priority', '-created_at')
+    ids = [comp.id for comp in comparisons if os.path.exists(comp.media_url_1) and os.path.exists(comp.media_url_2)]
+    return Comparison.objects.filter(id__in=ids).order_by('-priority', '-created_at')
 
 def index(request):
     return render(request, 'index.html', context=dict(
